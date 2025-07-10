@@ -14,7 +14,69 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      favorite_cities: {
+        Row: {
+          city_name: string
+          country: string | null
+          created_at: string
+          id: string
+          latitude: number | null
+          longitude: number | null
+          user_id: string
+        }
+        Insert: {
+          city_name: string
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          user_id: string
+        }
+        Update: {
+          city_name?: string
+          country?: string | null
+          created_at?: string
+          id?: string
+          latitude?: number | null
+          longitude?: number | null
+          user_id?: string
+        }
+        Relationships: []
+      }
+      user_preferences: {
+        Row: {
+          auto_refresh_interval: number
+          created_at: string
+          id: string
+          language: string
+          notifications_enabled: boolean
+          temperature_unit: string
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          auto_refresh_interval?: number
+          created_at?: string
+          id?: string
+          language?: string
+          notifications_enabled?: boolean
+          temperature_unit?: string
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          auto_refresh_interval?: number
+          created_at?: string
+          id?: string
+          language?: string
+          notifications_enabled?: boolean
+          temperature_unit?: string
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
