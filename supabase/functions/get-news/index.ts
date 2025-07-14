@@ -17,7 +17,7 @@ serve(async (req) => {
     
     const apiKey = Deno.env.get('NEWS_API_KEY');
     if (!apiKey) {
-      console.error('NewsAPI key not found');
+      console.error('Newsdata API key not found');
       return new Response(
         JSON.stringify({ error: 'News service unavailable' }),
         { 
@@ -29,23 +29,20 @@ serve(async (req) => {
 
     // Define search queries for different categories
     const categoryQueries = {
-      all: 'weather OR climate OR environment OR technology',
-      weather: 'weather OR climate OR meteorology',
-      science: 'climate science OR environmental science',
-      technology: 'weather technology OR climate tech',
-      environment: 'environment OR sustainability OR climate change'
+      all: 'weather,climate,environment,technology',
+      weather: 'weather,climate,meteorology',
+      science: 'science,climate,environment',
+      technology: 'technology,innovation,tech',
+      environment: 'environment,sustainability,climate'
     };
 
     const query = categoryQueries[category as keyof typeof categoryQueries] || categoryQueries.all;
     
-    // Get news from the last 7 days to ensure fresh content
-    const fromDate = new Date();
-    fromDate.setDate(fromDate.getDate() - 7);
-    const from = fromDate.toISOString().split('T')[0];
-
-    const newsUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&from=${from}&sortBy=publishedAt&language=en&page=${page}&pageSize=20&apiKey=${apiKey}`;
+    // Newsdata API parameters - fetch from multiple countries
+    const countries = 'us,gb,ca,au,de,fr,in,jp'; // Multiple countries for diverse news
+    const newsUrl = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodeURIComponent(query)}&country=${countries}&language=en&size=20&page=${page}`;
     
-    console.log('Fetching news with query:', query);
+    console.log('Fetching news with query:', query, 'from countries:', countries);
     
     const response = await fetch(newsUrl);
     
@@ -63,32 +60,34 @@ serve(async (req) => {
 
     const newsData = await response.json();
     
-    // Process and filter articles
-    const processedArticles = newsData.articles
+    // Process and filter articles (Newsdata API uses 'results' instead of 'articles')
+    const articles = newsData.results || [];
+    const processedArticles = articles
       .filter((article: any) => 
         article.title && 
         article.description && 
-        article.url && 
+        article.link && 
         article.title !== '[Removed]' &&
         article.description !== '[Removed]'
       )
       .map((article: any, index: number) => ({
-        id: `${article.publishedAt}-${index}`,
+        id: `${article.pubDate}-${index}`,
         title: article.title,
         description: article.description,
-        url: article.url,
-        imageUrl: article.urlToImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=250&fit=crop',
-        publishedAt: article.publishedAt,
-        source: article.source.name,
-        category: category === 'all' ? 'general' : category
+        url: article.link,
+        imageUrl: article.image_url || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=250&fit=crop',
+        publishedAt: article.pubDate,
+        source: article.source_id || 'Unknown',
+        category: category === 'all' ? 'general' : category,
+        country: article.country?.[0] || 'global'
       }));
 
-    console.log(`News fetched successfully: ${processedArticles.length} articles`);
+    console.log(`News fetched successfully: ${processedArticles.length} articles from ${countries}`);
 
     return new Response(
       JSON.stringify({
         articles: processedArticles,
-        totalResults: newsData.totalResults
+        totalResults: newsData.totalResults || processedArticles.length
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
