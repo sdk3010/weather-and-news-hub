@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -13,7 +12,7 @@ serve(async (req) => {
   }
 
   try {
-    const { category = 'weather', page = 1 } = await req.json();
+    const { category = 'all', page = 1 } = await req.json();
     
     const apiKey = Deno.env.get('NEWS_API_KEY');
     if (!apiKey) {
@@ -39,18 +38,18 @@ serve(async (req) => {
     const query = categoryQueries[category as keyof typeof categoryQueries] || categoryQueries.all;
     
     // Newsdata API parameters - fetch from multiple countries
-    const countries = 'us,gb,ca,au,de,fr,in,jp'; // Multiple countries for diverse news
-    const newsUrl = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodeURIComponent(query)}&country=${countries}&language=en&size=20&page=${page}`;
+    const countries = 'us,gb,ca,au,de,fr,in,jp';
+    const newsUrl = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodeURIComponent(query)}&country=${countries}&language=en&size=20`;
     
-    console.log('Fetching news with query:', query, 'from countries:', countries);
+    console.log('Fetching news with Newsdata API, query:', query);
     
     const response = await fetch(newsUrl);
     
     if (!response.ok) {
-      const errorData = await response.json();
-      console.error('NewsAPI error:', errorData);
+      const errorText = await response.text();
+      console.error('Newsdata API error:', response.status, errorText);
       return new Response(
-        JSON.stringify({ error: errorData.message || 'Failed to fetch news' }),
+        JSON.stringify({ error: `API request failed: ${response.status}` }),
         { 
           status: response.status, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -59,7 +58,20 @@ serve(async (req) => {
     }
 
     const newsData = await response.json();
+    console.log('Newsdata API response:', newsData);
     
+    // Check if API returned an error
+    if (newsData.status === 'error') {
+      console.error('Newsdata API error:', newsData.results);
+      return new Response(
+        JSON.stringify({ error: newsData.results?.message || 'API error' }),
+        { 
+          status: 422, 
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+
     // Process and filter articles (Newsdata API uses 'results' instead of 'articles')
     const articles = newsData.results || [];
     const processedArticles = articles
@@ -82,7 +94,7 @@ serve(async (req) => {
         country: article.country?.[0] || 'global'
       }));
 
-    console.log(`News fetched successfully: ${processedArticles.length} articles from ${countries}`);
+    console.log(`News fetched successfully: ${processedArticles.length} articles`);
 
     return new Response(
       JSON.stringify({
