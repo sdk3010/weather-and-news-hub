@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts"
 
 const corsHeaders = {
@@ -12,11 +13,11 @@ serve(async (req) => {
   }
 
   try {
-    const { category = 'all', page = 1 } = await req.json();
+    const { category = 'weather', page = 1 } = await req.json();
     
     const apiKey = Deno.env.get('NEWS_API_KEY');
     if (!apiKey) {
-      console.error('Newsdata API key not found');
+      console.error('NewsAPI key not found');
       return new Response(
         JSON.stringify({ error: 'News service unavailable' }),
         { 
@@ -28,28 +29,31 @@ serve(async (req) => {
 
     // Define search queries for different categories
     const categoryQueries = {
-      all: 'weather,climate,environment,technology',
-      weather: 'weather,climate,meteorology',
-      science: 'science,climate,environment',
-      technology: 'technology,innovation,tech',
-      environment: 'environment,sustainability,climate'
+      all: 'weather OR climate OR environment OR technology',
+      weather: 'weather OR climate OR meteorology',
+      science: 'climate science OR environmental science',
+      technology: 'weather technology OR climate tech',
+      environment: 'environment OR sustainability OR climate change'
     };
 
     const query = categoryQueries[category as keyof typeof categoryQueries] || categoryQueries.all;
     
-    // Newsdata API parameters - fetch from multiple countries
-    const countries = 'us,gb,ca,au,de,fr,in,jp';
-    const newsUrl = `https://newsdata.io/api/1/news?apikey=${apiKey}&q=${encodeURIComponent(query)}&country=${countries}&language=en&size=20`;
+    // Get news from the last 7 days to ensure fresh content
+    const fromDate = new Date();
+    fromDate.setDate(fromDate.getDate() - 7);
+    const from = fromDate.toISOString().split('T')[0];
+
+    const newsUrl = `https://newsapi.org/v2/everything?q=${encodeURIComponent(query)}&from=${from}&sortBy=publishedAt&language=en&page=${page}&pageSize=20&apiKey=${apiKey}`;
     
-    console.log('Fetching news with Newsdata API, query:', query);
+    console.log('Fetching news with query:', query);
     
     const response = await fetch(newsUrl);
     
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('Newsdata API error:', response.status, errorText);
+      const errorData = await response.json();
+      console.error('NewsAPI error:', errorData);
       return new Response(
-        JSON.stringify({ error: `API request failed: ${response.status}` }),
+        JSON.stringify({ error: errorData.message || 'Failed to fetch news' }),
         { 
           status: response.status, 
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
@@ -58,40 +62,25 @@ serve(async (req) => {
     }
 
     const newsData = await response.json();
-    console.log('Newsdata API response:', newsData);
     
-    // Check if API returned an error
-    if (newsData.status === 'error') {
-      console.error('Newsdata API error:', newsData.results);
-      return new Response(
-        JSON.stringify({ error: newsData.results?.message || 'API error' }),
-        { 
-          status: 422, 
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
-
-    // Process and filter articles (Newsdata API uses 'results' instead of 'articles')
-    const articles = newsData.results || [];
-    const processedArticles = articles
+    // Process and filter articles
+    const processedArticles = newsData.articles
       .filter((article: any) => 
         article.title && 
         article.description && 
-        article.link && 
+        article.url && 
         article.title !== '[Removed]' &&
         article.description !== '[Removed]'
       )
       .map((article: any, index: number) => ({
-        id: `${article.pubDate}-${index}`,
+        id: `${article.publishedAt}-${index}`,
         title: article.title,
         description: article.description,
-        url: article.link,
-        imageUrl: article.image_url || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=250&fit=crop',
-        publishedAt: article.pubDate,
-        source: article.source_id || 'Unknown',
-        category: category === 'all' ? 'general' : category,
-        country: article.country?.[0] || 'global'
+        url: article.url,
+        imageUrl: article.urlToImage || 'https://images.unsplash.com/photo-1504711434969-e33886168f5c?w=400&h=250&fit=crop',
+        publishedAt: article.publishedAt,
+        source: article.source.name,
+        category: category === 'all' ? 'general' : category
       }));
 
     console.log(`News fetched successfully: ${processedArticles.length} articles`);
@@ -99,7 +88,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         articles: processedArticles,
-        totalResults: newsData.totalResults || processedArticles.length
+        totalResults: newsData.totalResults
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
