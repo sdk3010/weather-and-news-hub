@@ -3,9 +3,7 @@ import { useState, useEffect } from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { NewsCard } from './NewsCard';
 import { NewsFilters } from './NewsFilters';
-import { Newspaper, Loader2 } from 'lucide-react';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { Newspaper, Filter } from 'lucide-react';
 
 interface NewsArticle {
   id: string;
@@ -24,59 +22,83 @@ export const NewsSection = () => {
   const [selectedCategory, setSelectedCategory] = useState('all');
   const [loading, setLoading] = useState(false);
 
-  const categories = ['all', 'weather', 'science', 'technology', 'environment'];
-
-  // Fetch news articles
-  const fetchNews = async (category: string = 'all') => {
-    setLoading(true);
-    try {
-      console.log('Fetching news for category:', category);
-      
-      const response = await supabase.functions.invoke('get-news', {
-        body: { category, page: 1 }
-      });
-
-      if (response.error) {
-        console.error('Error fetching news:', response.error);
-        toast.error('Failed to fetch news articles');
-        return;
-      }
-
-      const newsData = response.data;
-      console.log('News fetched successfully:', newsData.articles.length, 'articles');
-      
-      setArticles(newsData.articles || []);
-    } catch (error) {
-      console.error('Error fetching news:', error);
-      toast.error('Failed to fetch news articles');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // Initial fetch
+  // Mock news data
   useEffect(() => {
-    fetchNews(selectedCategory);
+    const mockArticles: NewsArticle[] = [
+      {
+        id: '1',
+        title: 'Record-Breaking Heatwave Hits Europe This Summer',
+        description: 'Temperatures soar across European cities as climate experts warn of increasing frequency of extreme weather events.',
+        url: '#',
+        imageUrl: 'https://images.unsplash.com/photo-1470071459604-3b5ec3a7fe05?w=400&h=250&fit=crop',
+        publishedAt: '2024-01-15T10:30:00Z',
+        source: 'Weather News',
+        category: 'weather'
+      },
+      {
+        id: '2',
+        title: 'New Climate Research Shows Changing Precipitation Patterns',
+        description: 'Scientists discover significant shifts in rainfall distribution across global regions, affecting agriculture and water resources.',
+        url: '#',
+        imageUrl: 'https://images.unsplash.com/photo-1500375592092-40eb2168fd21?w=400&h=250&fit=crop',
+        publishedAt: '2024-01-14T14:15:00Z',
+        source: 'Science Today',
+        category: 'science'
+      },
+      {
+        id: '3',
+        title: 'Hurricane Season Predictions Released by Weather Service',
+        description: 'National weather services issue forecasts for the upcoming hurricane season with advanced tracking technology.',
+        url: '#',
+        imageUrl: 'https://images.unsplash.com/photo-1426604966848-d7adac402bff?w=400&h=250&fit=crop',
+        publishedAt: '2024-01-13T08:45:00Z',
+        source: 'Weather Central',
+        category: 'weather'
+      },
+      {
+        id: '4',
+        title: 'Tech Innovations in Weather Forecasting Accuracy',
+        description: 'AI and machine learning revolutionize weather prediction models, improving accuracy by 25% in recent studies.',
+        url: '#',
+        imageUrl: 'https://images.unsplash.com/photo-1649972904349-6e44c42644a7?w=400&h=250&fit=crop',
+        publishedAt: '2024-01-12T16:20:00Z',
+        source: 'Tech Weather',
+        category: 'technology'
+      },
+      {
+        id: '5',
+        title: 'Global Warming Impact on Local Weather Patterns',
+        description: 'New study reveals how climate change is affecting day-to-day weather in urban and rural areas worldwide.',
+        url: '#',
+        imageUrl: 'https://images.unsplash.com/photo-1488590528505-98d2b5aba04b?w=400&h=250&fit=crop',
+        publishedAt: '2024-01-11T12:00:00Z',
+        source: 'Climate Journal',
+        category: 'environment'
+      },
+      {
+        id: '6',
+        title: 'Winter Storm Preparedness: Essential Safety Tips',
+        description: 'Emergency services share crucial information for staying safe during severe winter weather conditions.',
+        url: '#',
+        imageUrl: 'https://images.unsplash.com/photo-1581091226825-a6a2a5aee158?w=400&h=250&fit=crop',
+        publishedAt: '2024-01-10T09:30:00Z',
+        source: 'Safety News',
+        category: 'weather'
+      }
+    ];
+    setArticles(mockArticles);
+    setFilteredArticles(mockArticles);
   }, []);
 
-  // Filter articles when category changes
   useEffect(() => {
     if (selectedCategory === 'all') {
       setFilteredArticles(articles);
     } else {
-      const filtered = articles.filter(article => 
-        article.category === selectedCategory || 
-        article.title.toLowerCase().includes(selectedCategory) ||
-        article.description.toLowerCase().includes(selectedCategory)
-      );
-      setFilteredArticles(filtered);
+      setFilteredArticles(articles.filter(article => article.category === selectedCategory));
     }
   }, [selectedCategory, articles]);
 
-  const handleCategoryChange = (category: string) => {
-    setSelectedCategory(category);
-    fetchNews(category);
-  };
+  const categories = ['all', 'weather', 'science', 'technology', 'environment'];
 
   return (
     <div className="space-y-6">
@@ -95,17 +117,10 @@ export const NewsSection = () => {
       <NewsFilters
         categories={categories}
         selectedCategory={selectedCategory}
-        onCategoryChange={handleCategoryChange}
+        onCategoryChange={setSelectedCategory}
       />
 
-      {loading ? (
-        <Card>
-          <CardContent className="flex flex-col items-center justify-center py-12">
-            <Loader2 className="h-8 w-8 animate-spin text-muted-foreground mb-4" />
-            <p className="text-muted-foreground">Loading latest news...</p>
-          </CardContent>
-        </Card>
-      ) : filteredArticles.length === 0 ? (
+      {filteredArticles.length === 0 ? (
         <Card>
           <CardContent className="flex flex-col items-center justify-center py-12">
             <Newspaper className="h-12 w-12 text-muted-foreground mb-4" />

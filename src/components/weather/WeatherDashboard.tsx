@@ -7,8 +7,6 @@ import { ForecastChart } from './ForecastChart';
 import { AddCityDialog } from './AddCityDialog';
 import { Plus, MapPin, Thermometer } from 'lucide-react';
 import { toast } from 'sonner';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 
 interface WeatherData {
   city: string;
@@ -26,144 +24,60 @@ interface WeatherData {
 }
 
 export const WeatherDashboard = () => {
-  const [showAddCity, setShowAddCity] = useState(false);
   const [weatherData, setWeatherData] = useState<WeatherData[]>([]);
-  const queryClient = useQueryClient();
+  const [loading, setLoading] = useState(false);
+  const [showAddCity, setShowAddCity] = useState(false);
 
-  // Fetch user's favorite cities
-  const { data: favoriteCities = [] } = useQuery({
-    queryKey: ['favoriteCities'],
-    queryFn: async () => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) return [];
-      
-      const { data, error } = await supabase
-        .from('favorite_cities')
-        .select('*')
-        .eq('user_id', user.id);
-      
-      if (error) {
-        console.error('Error fetching favorite cities:', error);
-        return [];
-      }
-      
-      return data || [];
-    }
-  });
-
-  // Add city mutation
-  const addCityMutation = useMutation({
-    mutationFn: async (cityName: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      // First, get weather data to validate the city
-      const response = await supabase.functions.invoke('get-weather', {
-        body: { city: cityName }
-      });
-
-      if (response.error) {
-        throw new Error(response.error.message || 'Failed to fetch weather data');
-      }
-
-      const weatherInfo = response.data;
-
-      // Add to favorite cities
-      const { error } = await supabase
-        .from('favorite_cities')
-        .insert({
-          user_id: user.id,
-          city_name: weatherInfo.city,
-          country: null,
-          latitude: null,
-          longitude: null
-        });
-
-      if (error) {
-        if (error.code === '23505') { // Unique constraint violation
-          throw new Error('City already exists in your favorites');
-        }
-        throw error;
-      }
-
-      return weatherInfo;
-    },
-    onSuccess: (weatherInfo, cityName) => {
-      queryClient.invalidateQueries({ queryKey: ['favoriteCities'] });
-      toast.success(`Added ${cityName} to your favorite cities`);
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to add city');
-    }
-  });
-
-  // Remove city mutation
-  const removeCityMutation = useMutation({
-    mutationFn: async (cityName: string) => {
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) throw new Error('User not authenticated');
-
-      const { error } = await supabase
-        .from('favorite_cities')
-        .delete()
-        .eq('user_id', user.id)
-        .eq('city_name', cityName);
-
-      if (error) throw error;
-    },
-    onSuccess: (_, cityName) => {
-      queryClient.invalidateQueries({ queryKey: ['favoriteCities'] });
-      setWeatherData(prev => prev.filter(data => data.city !== cityName));
-      toast.success(`Removed ${cityName} from your favorite cities`);
-    },
-    onError: (error: any) => {
-      toast.error(error.message || 'Failed to remove city');
-    }
-  });
-
-  // Fetch weather data for favorite cities
+  // Mock data for demonstration
   useEffect(() => {
-    const fetchWeatherData = async () => {
-      if (favoriteCities.length === 0) {
-        setWeatherData([]);
-        return;
+    const mockWeatherData: WeatherData[] = [
+      {
+        city: 'New York',
+        temperature: 22,
+        description: 'Partly Cloudy',
+        humidity: 65,
+        windSpeed: 8.5,
+        icon: '02d',
+        forecast: [
+          { date: '2024-01-15', temp: 23, description: 'Sunny', icon: '01d' },
+          { date: '2024-01-16', temp: 21, description: 'Cloudy', icon: '03d' },
+          { date: '2024-01-17', temp: 19, description: 'Rainy', icon: '09d' },
+          { date: '2024-01-18', temp: 25, description: 'Sunny', icon: '01d' },
+          { date: '2024-01-19', temp: 24, description: 'Partly Cloudy', icon: '02d' },
+          { date: '2024-01-20', temp: 22, description: 'Cloudy', icon: '03d' },
+          { date: '2024-01-21', temp: 20, description: 'Rainy', icon: '09d' },
+        ]
+      },
+      {
+        city: 'London',
+        temperature: 15,
+        description: 'Rainy',
+        humidity: 78,
+        windSpeed: 12.3,
+        icon: '09d',
+        forecast: [
+          { date: '2024-01-15', temp: 16, description: 'Rainy', icon: '09d' },
+          { date: '2024-01-16', temp: 14, description: 'Cloudy', icon: '03d' },
+          { date: '2024-01-17', temp: 13, description: 'Rainy', icon: '09d' },
+          { date: '2024-01-18', temp: 17, description: 'Partly Cloudy', icon: '02d' },
+          { date: '2024-01-19', temp: 18, description: 'Sunny', icon: '01d' },
+          { date: '2024-01-20', temp: 16, description: 'Cloudy', icon: '03d' },
+          { date: '2024-01-21', temp: 15, description: 'Rainy', icon: '09d' },
+        ]
       }
-
-      console.log('Fetching weather for cities:', favoriteCities.map(c => c.city_name));
-      
-      const weatherPromises = favoriteCities.map(async (city) => {
-        try {
-          const response = await supabase.functions.invoke('get-weather', {
-            body: { city: city.city_name }
-          });
-
-          if (response.error) {
-            console.error(`Error fetching weather for ${city.city_name}:`, response.error);
-            return null;
-          }
-
-          return response.data as WeatherData;
-        } catch (error) {
-          console.error(`Error fetching weather for ${city.city_name}:`, error);
-          return null;
-        }
-      });
-
-      const results = await Promise.all(weatherPromises);
-      const validResults = results.filter((result): result is WeatherData => result !== null);
-      setWeatherData(validResults);
-    };
-
-    fetchWeatherData();
-  }, [favoriteCities]);
+    ];
+    setWeatherData(mockWeatherData);
+  }, []);
 
   const handleAddCity = (city: string) => {
-    addCityMutation.mutate(city);
+    // This will be replaced with actual API call
+    toast.success(`Added ${city} to your favorite cities`);
     setShowAddCity(false);
   };
 
   const handleRemoveCity = (city: string) => {
-    removeCityMutation.mutate(city);
+    setWeatherData(prev => prev.filter(data => data.city !== city));
+    toast.success(`Removed ${city} from your favorite cities`);
   };
 
   return (
@@ -200,7 +114,7 @@ export const WeatherDashboard = () => {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {weatherData.map((data, index) => (
               <WeatherCard
-                key={`${data.city}-${index}`}
+                key={index}
                 data={data}
                 onRemove={() => handleRemoveCity(data.city)}
               />
