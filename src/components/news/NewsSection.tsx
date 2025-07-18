@@ -40,11 +40,20 @@ export const NewsSection = () => {
 
       if (error) throw error;
 
+      console.log('Received data:', data);
+      console.log('Data type:', typeof data);
+      console.log('Is array:', Array.isArray(data));
+
       if (data && Array.isArray(data)) {
+        console.log('Processing as array with length:', data.length);
         setArticles(data);
         setFilteredArticles(data);
+      } else if (data && data.articles && Array.isArray(data.articles)) {
+        console.log('Processing as object with articles array, length:', data.articles.length);
+        setArticles(data.articles);
+        setFilteredArticles(data.articles);
       } else {
-        console.warn('No articles received');
+        console.warn('No articles received, data:', data);
         setArticles([]);
         setFilteredArticles([]);
       }
